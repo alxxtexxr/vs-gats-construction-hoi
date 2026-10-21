@@ -13,7 +13,7 @@ uv sync
 ### Download Data
 1. Download the dataset and put it into `datasets/hico`.
 
-2. Download the pretrain word2vec model on [GoogleNews](https://code.google.com/archive/p/word2vec/) and put it into `datasets/word2vec`.
+2. Download [GoogleNews-vectors-negative300.bin.gz](https://drive.google.com/file/d/0B7XkCwpI5KDYNlNUTTlSS21pQmM/edit?usp=sharing) and put it into `datasets/word2vec`.
 
 ### Process Data
 1. Copy `utils/generalized_rcnn.py` and `utils/roi_heads.py` to the folder including the implemented Faster R-CNN (`.venv/lib/python3.12/site-packages/torchvision/models/detection/`). We recommend you to backup the origial code first.
