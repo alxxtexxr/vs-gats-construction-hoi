@@ -153,7 +153,7 @@ if __name__ == "__main__":
             io.dump_json_object(output['labels'], nms_keep_indices_path)
             fc7_feat.create_dataset(anno['global_id'], data=output['fc7_feat'].float().cpu().detach().numpy())
             pool_feat.create_dataset(anno['global_id'], data=output['pool_feat'].float().cpu().detach().numpy())
-    print()
+    print() 
     fc7_feat.close()
     pool_feat.close()
     print('Make detection data successfully!')
