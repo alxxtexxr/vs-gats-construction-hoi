@@ -8,6 +8,7 @@ dependencies = [
     "h5py>=3.16.0",
     "ipdb>=0.13.13",
     "matplotlib>=3.11.2",
+    "numpy>=2.0.0",
     "opencv-python-headless>=5.0.0.93",
     "pyyaml>=6.0.3",
     "scipy>=1.17.1",
@@ -20,6 +21,12 @@ dependencies = [
 name = "pytorch-cu124"
 url = "https://download.pytorch.org/whl/cu124"
 explicit = true
+
+[tool.pyright]
+# Pyright must resolve imports from the uv-managed virtual environment.
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "off"
 
 [tool.uv.sources]
 # Linux (GPU server) gets the cu124 build; other platforms (e.g. macOS) fall
