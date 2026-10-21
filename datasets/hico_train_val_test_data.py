@@ -144,7 +144,8 @@ def parse_data(data_const,args):
             # det_feat = det_feat[selected_det_data[:, 5], :]
             feat = []
             for rpn_id in selected_det_data[:, 5]:
-                feat.append(np.expand_dims(det_feat[rpn_id, :], 0))
+                # rpn_id is float64 (stored as float in the hdf5 file); h5py indexing requires ints
+                feat.append(np.expand_dims(det_feat[int(rpn_id), :], 0))
             try:
                 feat = np.concatenate(feat, axis=0)
             except Exception as e:
