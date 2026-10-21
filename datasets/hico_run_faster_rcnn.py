@@ -27,11 +27,11 @@ def get_device(device: str = "auto") -> str:
 if __name__ == "__main__":
 
     parse = argparse.ArgumentParser("Run Faster RCNN detection to generate instance detection data!!!")
-    parse.add_argument("--faster_rcnn_path", '--f_r_p', type=str,
-                        default='/root/fasterrcnn-pytorch-training-pipeline/outputs/training/structural_acco_wico_20241023/best_model.pth',
+    parse.add_argument("--faster_rcnn_path", '--f_r_p', type=str, default=None, required=True,
                         help="path to the Faster RCNN checkpoint")
-    parse.add_argument('--device', '--d', type=str, default='auto', choices=['auto', 'cuda', 'mps', 'cpu'],
-                        help="which device to run the model on")
+    parse.add_argument('--device', '--d', type=str, default='auto', required=True,
+                       choices=['auto', 'cuda', 'mps', 'cpu'],
+                       help="which device to run the model on")
 
     args = parse.parse_args()
     

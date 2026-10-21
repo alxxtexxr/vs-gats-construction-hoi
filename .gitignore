@@ -10,3 +10,4 @@ __trash__
 
 *.pyc
 *.mp4
+faster_rcnn.pth

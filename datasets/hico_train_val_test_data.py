@@ -23,12 +23,19 @@ import torch
 
 # matplotlib.use('TKAgg')
 
-# def get_intersection(box1, box2):
-#     # !NOTE:this is a bug if box1 have no intersetion with box2
-#     return np.hstack((np.maximum(box1[:2], box2[:2]), np.minimum(box1[2:], box2[2:])))
+# if there's only 1 XML element, the xmltodict will read it as a dict,
+# so make the element to a list if it's a dict
+def if_dict_to_list(x):
+    if isinstance(x, dict): x = [x]
+    return x
 
-# def compute_area(box):
-#     return (box[2]-box[0])*(box[3]-box[1])
+def if_1d_arr_to_2d_arr(arr):
+    if arr.ndim == 1:
+        return np.expand_dims(arr, axis=0)
+    elif arr.ndim == 2:
+        return arr  # Already 2D
+    else:
+        raise ValueError("The array has more than 2 dimensions.")
 
 def get_node_index(classname, bbox, det_classes, det_boxes, node_num, labeled=True):
     # print("bbox =", bbox)
@@ -50,16 +57,15 @@ def get_node_index(classname, bbox, det_classes, det_boxes, node_num, labeled=Tr
                 # check bbox overlap
                 # intersection_area = compute_area(get_intersection(bbox, det_boxes[i_node, :]))
                 # iou = intersection_area/(compute_area(bbox)+compute_area(det_boxes[i_node, :])-intersection_area)
-                iou = compute_iou(bbox, det_boxes[i_node,:])
+                iou = compute_iou(bbox, det_boxes[i_node, :])
                 if iou > max_iou:
                     max_iou = iou
                     max_iou_index = i_node
         else:
-            iou = compute_iou(bbox, det_boxes[i_node,:])
+            iou = compute_iou(bbox, det_boxes[i_node, :])
             
             # custom
             if iou > 0.1:
-                # print(f"{iou:.3f}", end=", ")
                 total_iou_gt_0 += 1
             else:
                 total_iou_eq_0 += 1
@@ -67,13 +73,6 @@ def get_node_index(classname, bbox, det_classes, det_boxes, node_num, labeled=Tr
             if iou > max_iou:
                 max_iou = iou
                 max_iou_index = i_node
-                # print('iou:', iou, ';', 'index:', i_node, ';', 'bbox:', bbox)
-    
-    # custom
-    # print()
-    # print(f"total iou > 0 = {total_iou_gt_0}, total iou == 0 = {total_iou_eq_0}")
-    # print("[RETURN VALUE] max_iou_index =", max_iou_index)
-    # print()
     
     return max_iou_index
 
@@ -81,7 +80,7 @@ def parse_data(data_const,args):
 
     assert os.path.exists(data_const.clean_dir), 'Please check the path to annotion file!'
 
-    anno_data = scio.loadmat(data_const.clean_dir + '/anno_bbox.mat')
+    anno_data = scio.loadmat(data_const.clean_dir + '/anno_bbox.mat', simplify_cells=True)
     print('Load original data successfully!')
 
     boxes_scores_rpn_ids_labels = h5py.File(data_const.boxes_scores_rpn_ids_labels, 'r')
@@ -99,7 +98,6 @@ def parse_data(data_const,args):
     bad_dets_imgs = {'0': [], '1': [], 'no_human': []} 
     # parsing data
     for phase in ['bbox_train', 'bbox_test']:
-
         if not args.vis_result:
             if phase == 'bbox_train':
                 if args.feat_type == 'fc7':
@@ -125,24 +123,13 @@ def parse_data(data_const,args):
             # img_list = [1761,23,44,50,53,72,75,79,93,109,127,129,138,139,490,496]
             img_list = [14663] #range(data.shape[1])
         else:
-            img_list = range(data.shape[1])
+            img_list = range(len(data))
 
         for i, i_img in enumerate(tqdm(img_list)):
             # load detection data
             # ipdb.set_trace()
-            img_name = data['filename'][0,i_img][0]
+            img_name = data[i_img]['filename']
             global_id = img_name.split(".")[0]
-            
-            # # DEBUG
-            # if global_id not in ['ACCO_train2024_00002421']:
-            #     continue
-
-            # print("global_id:", global_id)
-            
-            # custom: skip nonexistent data
-            # if global_id not in boxes_scores_rpn_ids_labels:
-            #     print("Skipped! global_id is not in boxes_scores_rpn_ids_labels")
-            #     continue
             
             selected_det_data = boxes_scores_rpn_ids_labels[global_id]['boxes_scores_rpn_ids']
             det_feat = boxes_feat[global_id]
@@ -163,24 +150,37 @@ def parse_data(data_const,args):
             except Exception as e:
                 ipdb.set_trace()
             det_boxes = selected_det_data[:, :4]
-            det_class = selected_det_data[:, -1].astype(int)
             det_scores = selected_det_data[:, 4]
+            det_class = selected_det_data[:, -1].astype(int)
+            
+            # CUSTOM: Convert initial detected Faster R-CNN classes to HICO classes
+            det_class_fasterrcnn = det_class
+            det_class = np.array([metadata.fasterrcnn_to_hico_label(fasterrcnn_label) for fasterrcnn_label in det_class_fasterrcnn])
 
-            if len(np.where(det_class == 1)[0])==0:
+            # CUSTOM: Fix the sorting of the detections; ensure the human detections appear first in the detections
+            zipped_det_data = list(zip(det_class, det_class_fasterrcnn, det_scores, det_boxes))
+
+            # Sort by det_class (det_data[0]); since the classs for human detections is 1, they will appear first
+            zipped_det_data.sort(key=lambda det_data: det_data[0])
+            
+            # Unzip the sorted detections and return the types
+            det_class, det_class_fasterrcnn, det_scores, det_boxes = zip(*zipped_det_data)
+            det_class = np.array(det_class)
+            det_class_fasterrcnn = np.array(det_class_fasterrcnn)
+            det_scores = np.array(det_scores)
+            det_boxes = np.array(det_boxes)
+
+            # human_class = 24
+            human_class = 1
+
+            if len(np.where(det_class == human_class)[0]) == 0:
                 print('bad dets:', det_class)
                 print('bad global_id:', global_id)
                 bad_dets_imgs['no_human'].append(global_id)
                 continue
 
-            # from coco label to hico label
-            # det_class = np.array(metadata.coco_to_hico)[det_class].astype(int)
-            
-            # from coco_pytorch(91) label to coco_81 label
-            # det_class = np.array(metadata.coco_pytorch_to_coco)[det_class.astype(int)].astype(int)
-
             # calculate the number of nodes
-            human_num = len(np.where(det_class == 1)[0])
-            object_num = len(np.where(det_class != 1)[0]) # it's not used in this code, but used just for debugging purpose
+            human_num = len(np.where(det_class == human_class)[0])
             node_num = len(det_class)
             labeled_edge_list = np.cumsum(node_num - np.arange(human_num) - 1)
             labeled_edge_num = labeled_edge_list[-1]
@@ -192,99 +192,57 @@ def parse_data(data_const,args):
             if args.vis_result:
                 image_gt = Image.open(os.path.join(data_const.clean_dir, 'images/train2015', img_name)).convert('RGB')
                 raw_action = np.zeros(117)
-            
-            # CUSTOM
-            # print("================================================")
-            # print(f"global_id = {global_id}")
-            # print("================================================")
 
-            # print(f"data['hoi'][0,i_img].shape[1] = {data['hoi'][0,i_img].shape[1]}")
-            if not data['hoi'][0,i_img].shape[1]:
+            if not len(data[i_img]['hoi']):
                 print(f"i_img = {i_img} is skipped")
                 print()
                 continue
-            # print()
 
-            # DEBUG
-            # if global_id not in [
-            #     # 'ACCO_train2024_00000001',
-            #     'ACCO_train2024_00000003',
-            # ]:
-            #     # print("Skipped for debugging...")
-            #     continue
-            print("global_id:", global_id)
+            hoi = if_dict_to_list(data[i_img]['hoi'])
+            for hoi_i in hoi:
+                hoi_i_id = hoi_i['id']
+                action_id = metadata.hoi_to_action[hoi_i_id - 1] # !NOTE: Need to subtract 1
+                bboxhuman = if_dict_to_list(hoi_i['bboxhuman'])
+                bboxobject = if_dict_to_list(hoi_i['bboxobject'])
+                connection = if_1d_arr_to_2d_arr(hoi_i['connection'])
+                
+                for connection_i in connection:
+                    human_bbox_idx = connection_i[0] - 1
+                    object_bbox_idx = connection_i[1] - 1
 
-            for i_hoi in range(data['hoi'][0,i_img]['id'].shape[1]):
-                try:
-                    hoi_id = data['hoi'][0, i_img]['id'][0, i_hoi][0, 0]
-                    action_id = metadata.hoi_to_action[hoi_id - 1]  # !NOTE: Need to subtract 1 
-                    print("================================")
-                    print("hoi id:", hoi_id)
-                    print("================================")
-                    # print('action_id:', action_id)
-                    # print('x1 shape[1]:', data['hoi'][0, i_img]['bboxhuman'][0, i_hoi]['x1'].shape[1])
-                    for j_h in range(data['hoi'][0, i_img]['bboxhuman'][0, i_hoi]['x1'].shape[1]):
-                        # hoi_id = data['hoi'][0, i_img]['id'][0, i_hoi][0, 0]
-                        # action_id = metadata.hoi_to_action[hoi_id - 1]  # !NOTE: Need to subtract 1 
+                    classname = 'human'
+                    human_bbox = bboxhuman[human_bbox_idx]
+                    h_x1 = human_bbox['x1']
+                    h_y1 = human_bbox['y1']
+                    h_x2 = human_bbox['x2']
+                    h_y2 = human_bbox['y2']
+                    human_index = get_node_index(classname, [h_x1, h_y1, h_x2, h_y2], det_class, det_boxes, node_num, labeled=args.labeled)
+                    
+                    classname = list_action[hoi_i_id - 1]['nname'] # !NOTE: Need to subtract 1
+                    object_bbox = bboxobject[object_bbox_idx]
+                    o_x1 = object_bbox['x1']
+                    o_y1 = object_bbox['y1']
+                    o_x2 = object_bbox['x2']
+                    o_y2 = object_bbox['y2']
+                    obj_index = get_node_index(classname, [o_x1, o_y1, o_x2, o_y2], det_class, det_boxes, node_num, labeled=args.labeled)
 
-                        # ipdb.set_trace()
-                        classname = 'worker'
-                        h_x1 = data['hoi'][0, i_img]['bboxhuman'][0, i_hoi]['x1'][0, j_h][0, 0]
-                        h_y1 = data['hoi'][0, i_img]['bboxhuman'][0, i_hoi]['y1'][0, j_h][0, 0]
-                        h_x2 = data['hoi'][0, i_img]['bboxhuman'][0, i_hoi]['x2'][0, j_h][0, 0]
-                        h_y2 = data['hoi'][0, i_img]['bboxhuman'][0, i_hoi]['y2'][0, j_h][0, 0]
-                        # print('human box:', [h_x1, h_y1, h_x2, h_y2])
-                        human_index = get_node_index(classname, [h_x1, h_y1, h_x2, h_y2], det_class, det_boxes, node_num, labeled=args.labeled)
-                        # print('human_index:', human_index)
+                    if args.vis_result:
+                        raw_action[action_id] = 1
+                        image_gt = vis_img(image_gt, [[h_x1, h_y1, h_x2, h_y2], [o_x1, o_y1, o_x2, o_y2]], [1, metadata.coco_classes.index(classname)], raw_action=action_id, data_gt=True)
 
-                        j_o = data['hoi'][0, i_img]['connection'][0, i_hoi][j_h][1] - 1
-                        # print('j_o:', j_o)
-                        print('human id (j_h):', j_h, ', object id (j_o):', j_o+1)
-                        print('connection:')
-                        print(data['hoi'][0, i_img]['connection'][0, i_hoi])
-                        print()
-                        classname = list_action['nname'][hoi_id-1, 0][0]    # !NOTE: Need to subtract 1
-                        o_x1 = data['hoi'][0, i_img]['bboxobject'][0, i_hoi]['x1'][0, j_o][0, 0]
-                        o_y1 = data['hoi'][0, i_img]['bboxobject'][0, i_hoi]['y1'][0, j_o][0, 0]
-                        o_x2 = data['hoi'][0, i_img]['bboxobject'][0, i_hoi]['x2'][0, j_o][0, 0]
-                        o_y2 = data['hoi'][0, i_img]['bboxobject'][0, i_hoi]['y2'][0, j_o][0, 0]
-                        obj_index = get_node_index(classname, [o_x1, o_y1, o_x2, o_y2], det_class, det_boxes, node_num, labeled=args.labeled)
-                        # print()
-                        # print('gt box:', [o_x1, o_y1, o_x2, o_y2])
-                        # print('det_boxes:', det_boxes)
-                        # print()
-                        # print('obj_index:', obj_index)
-                        
-                        # print("action_id:", action_id)
-                        
-                        if args.vis_result:
-                            raw_action[action_id] = 1
-                            image_gt = vis_img(image_gt, [[h_x1, h_y1, h_x2, h_y2],[o_x1, o_y1, o_x2, o_y2]], [1, metadata.coco_classes.index(classname)], raw_action=action_id, data_gt=True)
+                    if human_index != -1 and obj_index != -1:
+                        edge_idx = labeled_edge_list[human_index-1] + (obj_index-human_index-1)
+                        edge_labels[edge_idx, action_id] = 1
+                    else:
+                        print("[MISS]")
 
-                        # print(f"human_index = {human_index} ({human_index != -1}) && obj_index = {obj_index} ({obj_index != -1})")
-                        if human_index != -1 and obj_index != -1:
-                            # print('labeled_edge_list:', len(labeled_edge_list))
-                            edge_idx = labeled_edge_list[human_index-1] + (obj_index-human_index-1)
-                            # print(f"[GET] edge_idx = {edge_idx}")
-                            edge_labels[edge_idx, action_id] = 1 
-                except IndexError:
-                    pass
-                print()
-                # print()
-            print("================================")
-            print("edge_labels shape:", edge_labels.shape, "--> (num. possible edges givin N nodes?, num. actions)")
-            print()
-            print("N all nodes:", node_num)
-            print("N human nodes:", human_num)
-            print("num. possible edges givin N nodes:", node_num)
-            print()
-            # print("are all edge_labels values 0? =", (edge_labels == 0).all())
-            # print()
             # visualizing result instead of saving result
             if args.vis_result:
                 # ipdb.set_trace()
                 image_res = Image.open(os.path.join(data_const.clean_dir, 'images/train2015', img_name)).convert('RGB')
-                result = vis_img(image_res, det_boxes, det_class, det_scores, edge_labels, score_thresh=0.4)
+                result = vis_img(image_res, det_boxes, 
+                                 det_class_fasterrcnn, # det_class, 
+                                 det_scores, edge_labels, score_thresh=0.4)
                 plt.figure(figsize=(100,100))
                 plt.suptitle(img_name)
                 plt.subplot(1,2,1)
@@ -297,6 +255,7 @@ def parse_data(data_const,args):
                 plt.ion()
                 plt.pause(100)
                 plt.close()
+            # FILE: hico_train_val_test_data_custom.py
             # save precessed data
             else:
                 save_data.create_group(global_id)
@@ -304,16 +263,17 @@ def parse_data(data_const,args):
                 # save_data[global_id].create_dataset('img_name', data=img_name)
                 save_data[global_id].create_dataset('boxes', data=det_boxes)
                 save_data[global_id].create_dataset('classes', data=det_class)
+
+                # CUSTOM: Store Faster R-CNN classes to trace them later in inference
+                # save_data[global_id].create_dataset('classes_fasterrcnn', data=det_class)
+                save_data[global_id].create_dataset('classes_fasterrcnn', data=det_class_fasterrcnn)
+
                 save_data[global_id].create_dataset('scores', data=det_scores)
                 save_data[global_id].create_dataset('edge_labels', data=edge_labels)
                 save_data[global_id].create_dataset('feature', data=feat)
-        print("data.shape:", data.shape)
-        print("len(save_data):", len(save_data))
         if not args.vis_result:
             save_data.close()
-    # print('are all edge_labels values 0? =', (edge_labels == 0).all())
-    # for el in edge_labels:
-    #     print(*el)
+    
     # create file to save images with no selected detection
     print(f"bad instance detection: <0 det>---{len(bad_dets_imgs['0'])}, <1 det>---{len(bad_dets_imgs['1'])}, <no human det>---{len(bad_dets_imgs['no_human'])}")
     io.dump_json_object(bad_dets_imgs, os.path.join('result', 'bad_faster_rcnn_det_imgs_edge.json'))
