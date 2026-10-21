@@ -181,7 +181,8 @@ class HicoDataset(Dataset):
         #data['node_num'] = single_app_data['node_num'].value
         data['node_num'] = single_app_data['node_num']
         if isinstance(data['node_num'], h5py._hl.dataset.Dataset):
-            data['node_num'] = data['node_num'].value
+            # h5py >= 3 removed Dataset.value; [()] reads a scalar dataset.
+            data['node_num'] = data['node_num'][()]
         # data['node_labels'] = single_app_data['node_labels'][:]
         data['edge_labels'] = single_app_data['edge_labels'][:]
         data['edge_num'] = data['edge_labels'].shape[0]
@@ -218,7 +219,8 @@ class HicoDataset(Dataset):
         data['roi_labels'] = single_app_data['classes'][:]
         data['roi_labels_fasterrcnn'] = single_app_data['classes_fasterrcnn'][:] # CUSTOM
         data['roi_scores'] = single_app_data['scores'][:]
-        data['node_num'] = single_app_data['node_num'].value
+        # h5py >= 3 removed Dataset.value; [()] reads a scalar dataset.
+        data['node_num'] = single_app_data['node_num'][()]
         # data['node_labels'] = single_app_data['node_labels'][:]
         data['edge_labels'] = single_app_data['edge_labels'][:]
         data['edge_num'] = data['edge_labels'].shape[0]

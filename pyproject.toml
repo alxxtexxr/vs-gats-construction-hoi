@@ -2,19 +2,35 @@
 name = "vs-gats-structural-hhi-hoi"
 version = "0.1.0"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "gensim>=4.4.0",
     "h5py>=3.16.0",
     "ipdb>=0.13.13",
     "matplotlib>=3.11.2",
-    "numpy>=2.0.0",
-    "opencv-python-headless>=5.0.0.93",
+    "numpy>=2.0.0; sys_platform != 'darwin'",
+    # torch 2.3 predates numpy-2 support, so keep numpy 1.x on macOS.
+    "numpy>=1.26.0,<2; sys_platform == 'darwin'",
+    # opencv 5.x requires numpy>=2; macOS keeps numpy 1.x for torch 2.3.
+    "opencv-python-headless==4.10.0.84; sys_platform == 'darwin'",
+    "opencv-python-headless>=5.0.0.93; sys_platform != 'darwin'",
     "pyyaml>=6.0.3",
     "scikit-image>=0.26.0",
+    "scikit-learn>=1.4.0",
     "scipy>=1.17.1",
-    "torch==2.6.0",
-    "torchvision==0.21.0",
+    "torch==2.6.0; sys_platform != 'darwin'",
+    "torchvision==0.21.0; sys_platform != 'darwin'",
+    # dgl 2.2.1 is the last release with macOS arm64 wheels; its prebuilt
+    # graphbolt dylibs only support torch 2.1.0-2.3.0, so macOS pins older
+    # torch/torchvision than the Linux GPU server.
+    "dgl==2.2.1; sys_platform == 'darwin'",
+    # dgl 2.2.1 imports torchdata.datapipes, removed in torchdata>=0.10.
+    "torchdata==0.7.1; sys_platform == 'darwin'",
+    # dgl 2.2.1's graphbolt imports pydantic without declaring it.
+    "pydantic>=2.0.0; sys_platform == 'darwin'",
+    "torch==2.3.0; sys_platform == 'darwin'",
+    "torchvision==0.18.0; sys_platform == 'darwin'",
+    "tensorboardX>=2.6.0",
     "tqdm>=4.70.1",
 ]
 
@@ -28,6 +44,10 @@ explicit = true
 venvPath = "."
 venv = ".venv"
 typeCheckingMode = "off"
+
+[tool.uv]
+# dgl publishes no macOS-arm64 wheels on PyPI; its arm64 wheels live here.
+find-links = ["https://data.dgl.ai/wheels/repo.html"]
 
 [tool.uv.sources]
 # Linux (GPU server) gets the cu124 build; other platforms (e.g. macOS) fall
