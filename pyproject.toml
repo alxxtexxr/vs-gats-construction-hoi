@@ -22,5 +22,11 @@ url = "https://download.pytorch.org/whl/cu124"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu124" }
-torchvision = { index = "pytorch-cu124" }
+# Linux (GPU server) gets the cu124 build; other platforms (e.g. macOS) fall
+# back to PyPI, where torch ships CPU + MPS builds.
+torch = [
+    { index = "pytorch-cu124", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cu124", marker = "sys_platform == 'linux'" },
+]
