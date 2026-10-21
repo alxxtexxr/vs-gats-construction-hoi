@@ -49,12 +49,9 @@ if __name__ == "__main__":
                             "watchdog timeout that aborts long FP32 forward passes.")
 
     args = parse.parse_args()
-
-    # determine device
-    device = get_device(args.device)
-    print('Device:', device)
-
+    
     # set up model
+    device = get_device(args.device)
     checkpoint = torch.load(args.faster_rcnn_path, map_location=device)
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn(coco_model=False, rpn_post_nms_top_n_test=200, \
                                                                  box_batch_size_per_image=128, box_score_thresh=0.1, box_nms_thresh=0.3,
@@ -67,6 +64,10 @@ if __name__ == "__main__":
     model.eval()
 
     print('Beginning...')
+    print(f'Device: {device}{" (auto)" if args.device == "auto" else ""}')
+    print('Batch size:', args.batch_size)
+    print('Number of workers:', args.num_workers)
+    print('FP16:', args.half)
     data_const = HicoConstants()
     anno_list = io.load_json_object(data_const.anno_list_json)
     save_dir = data_const.faster_rcnn_boxes
@@ -99,7 +100,7 @@ if __name__ == "__main__":
                    for start in range(0, len(anno_list), args.batch_size)]
 
     use_batched = args.batch_size > 1
-    progress = tqdm(total=len(num_batches), desc='Running Faster RCNN')
+    progress = tqdm(total=len(num_batches), desc=f'Running Faster RCNN on {len(anno_list)} images at {args.batch_size} images per batch', unit='batch')
     for batch, indices in zip(prefetch_batches(num_batches), num_batches, strict=True):
         if args.half and device in ('mps', 'cuda'):
             batch = [input.to(device).half() for input in batch]
@@ -152,7 +153,7 @@ if __name__ == "__main__":
             io.dump_json_object(output['labels'], nms_keep_indices_path)
             fc7_feat.create_dataset(anno['global_id'], data=output['fc7_feat'].float().cpu().detach().numpy())
             pool_feat.create_dataset(anno['global_id'], data=output['pool_feat'].float().cpu().detach().numpy())
-
+    print()
     fc7_feat.close()
     pool_feat.close()
     print('Make detection data successfully!')
