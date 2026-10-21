@@ -1,0 +1,12 @@
+test_img
+checkpoints
+log
+old_log
+inference_imgs
+__pycache__
+__trash__
+.vscode
+
+
+*.pyc
+*.mp4
