@@ -326,11 +326,11 @@ parser.add_argument('--sampler',  type=float, default=0,
                     help='h_h edge, h_o edge, o_o edge are different with each other')
 
 # CUSTOM
-parser.add_argument('--use_feat', type=str2bool, default='true', required=True,
+parser.add_argument('--use_feat', type=str2bool, default='true',
                      help="Use visual (e.g. fc7, pool) features? (default: 'true')")
-parser.add_argument('--use_word2vec', type=str2bool, default='true', required=True,
+parser.add_argument('--use_word2vec', type=str2bool, default='true',
                      help="Use word2vec? (default: 'true')")
-parser.add_argument('--use_spatial_feat', type=str2bool, default='true', required=True,
+parser.add_argument('--use_spatial_feat', type=str2bool, default='true',
                      help="Use spatial features? (default: 'true')")
 
 args = parser.parse_args() 

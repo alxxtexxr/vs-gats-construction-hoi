@@ -49,15 +49,21 @@ uv run hico_trainval.py \
     --bn=False \
     --m_a='false' \
     --d_a='false' \
-    --diff_edge='false' \
-    --use_feat='true' \
-    --use_word2vec='true' \
-    --use_spatial_feat='true'
+    --diff_edge='false'
 ```
 
 You can visualize the training process using TensorBoard:
 ```bash
-uv run tensorboard --logdir=log/
+uv run tensorboard --logdir='log/'
 ```
 
 Model checkpoints are saved in the `checkpoints/` directory.
+
+## Evaluation
+Start evaluation by running:
+```bash
+uv run hico_eval.py \
+    --checkpoint_path='checkpoints/hico/<train_name>/epoch_train/checkp
+oint_<epoch>_epoch.pth' \
+    --subset='test'
+```

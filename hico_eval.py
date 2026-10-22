@@ -1,5 +1,5 @@
 """
-Inference evaluation for HOI detection (Faster R-CNN detections + AGRNN action heads).
+Evaluation for HOI detection (Faster R-CNN detections + AGRNN action heads).
 
 For each image in the given subset, the script:
   1. Extracts ground truth HOI detections from the dataset edge labels.
@@ -9,7 +9,7 @@ For each image in the given subset, the script:
      TP/FP/FN counts per action class.
   4. Reports per-class GT/TP/FP/FN and the mAP over the full action list.
 
-Usage: python3 inference_eval.py [--pretrained PATH] [--subset SUBSET]
+Usage: python3 hico_eval.py [--checkpoint_path PATH] [--subset SUBSET]
 """
 
 import argparse
@@ -84,7 +84,7 @@ def nms_by_num_confident_actions(boxes, num_confident_actions, iou_thresh=0.5):
     return keep_idxs.tolist()
 
 
-def match_hoi_tp_fp(pred_det, gt_det, human_iou_thres=0.5, object_iou_thres=0.5):
+def match_hoi_tp_fp(pred_det, gt_det, human_iou_thresh=0.5, object_iou_thresh=0.5):
     """Match a predicted HOI against a ground truth HOI.
 
     Each detection is [human_bbox(4), object_bbox(4), object_type, action_label].
@@ -110,13 +110,13 @@ def match_hoi_tp_fp(pred_det, gt_det, human_iou_thres=0.5, object_iou_thres=0.5)
     is_fp_object = False
 
     human_iou = compute_iou(pred_human_bbox, gt_human_bbox)
-    if human_iou >= human_iou_thres:
+    if human_iou >= human_iou_thresh:
         is_tp_human = True
     else:
         is_fp_human = True
 
     object_iou = compute_iou(pred_object_bbox, gt_object_bbox)
-    if object_iou >= object_iou_thres:
+    if object_iou >= object_iou_thresh:
         is_tp_object = True
     else:
         is_fp_object = True
@@ -127,7 +127,7 @@ def match_hoi_tp_fp(pred_det, gt_det, human_iou_thres=0.5, object_iou_thres=0.5)
     return is_match, is_tp_human, is_tp_object, is_fp_human, is_fp_object
 
 
-def compute_tp_fp_fn(pred_dets, gt_dets, num_classes, human_iou_thres=0.5, object_iou_thres=0.5):
+def compute_tp_fp_fn(pred_dets, gt_dets, num_classes, human_iou_thresh=0.5, object_iou_thresh=0.5):
     """Accumulate TP/FP/FN counts per action class.
 
     TP: prediction matches a ground truth IoU-wise and the action label is correct.
@@ -145,7 +145,7 @@ def compute_tp_fp_fn(pred_dets, gt_dets, num_classes, human_iou_thres=0.5, objec
         found_match = False
         for pred_det in pred_dets:
             is_match, _, _, _, _ = match_hoi_tp_fp(
-                pred_det, gt_det, human_iou_thres, object_iou_thres
+                pred_det, gt_det, human_iou_thresh, object_iou_thresh
             )
 
             if is_match:
@@ -165,7 +165,7 @@ def compute_tp_fp_fn(pred_dets, gt_dets, num_classes, human_iou_thres=0.5, objec
         is_pred_matched = False
 
         for gt_det in gt_dets:
-            is_match, _, _, _, _ = match_hoi_tp_fp(pred_det, gt_det, human_iou_thres, object_iou_thres)
+            is_match, _, _, _, _ = match_hoi_tp_fp(pred_det, gt_det, human_iou_thresh, object_iou_thresh)
             if is_match:
                 is_pred_matched = True
                 break
@@ -197,12 +197,12 @@ def compute_gt_counts(gt_dets, num_classes):
     return gt_counts
 
 
-def load_model(pretrained_path, proc_dir, device):
+def load_model(pretrained_path, device):
     """Load a checkpointed AGRNN model onto the given device."""
     checkpoint = torch.load(pretrained_path, map_location=device)
     print('Checkpoint loaded!')
 
-    data_const = HicoConstants(proc_dir=proc_dir, feat_type=checkpoint['feat_type'])
+    data_const = HicoConstants(feat_type=checkpoint['feat_type'])
 
     model = AGRNN(
         feat_type=checkpoint['feat_type'],
@@ -258,7 +258,7 @@ def run_inference(model, data, device):
 
 
 def evaluate_image(model, data, image, device, num_classes,
-                   human_iou_thres, object_iou_thres):
+                   human_iou_thresh, object_iou_thresh):
     """Evaluate a single image: compute GT and prediction detection lists and
     accumulate their TP/FP/FN and GT counts."""
     # Unpack the collated batch-of-1; vis helpers expect single-image arrays.
@@ -304,26 +304,24 @@ def evaluate_image(model, data, image, device, num_classes,
         det_h_bboxs_o_bboxs_action_class,
         gt_h_bboxs_o_bboxs_action_class,
         num_classes,
-        human_iou_thres=human_iou_thres,
-        object_iou_thres=object_iou_thres,
+        human_iou_thresh=human_iou_thresh,
+        object_iou_thresh=object_iou_thresh,
     )
 
     return gt_counts, tp, fp, fn
 
 
 def main():
-    parser = argparse.ArgumentParser(description='HOI Inference Evaluation')
-    parser.add_argument('--pretrained', '-p', type=str,
+    parser = argparse.ArgumentParser(description='HOI Evaluation')
+    parser.add_argument('--checkpoint_path', '--c_p', type=str,
                         default='checkpoints/hico/vs_gats_train/epoch_train/checkpoint_300_epoch.pth',
                         help='Path to the AGRNN checkpoint to evaluate')
-    parser.add_argument('--proc_dir', type=str, default='datasets/processed/hico',
-                        help='Path to HICO processed data directory')
     parser.add_argument('--subset', type=str, default='test',
                         choices=['train', 'test', 'train_val'],
                         help='Subset of data to run the evaluation on')
-    parser.add_argument('--human_iou_thres', type=float, default=0.5,
+    parser.add_argument('--human_iou_thresh', type=float, default=0.5,
                         help='IoU threshold for the human bounding box match')
-    parser.add_argument('--object_iou_thres', type=float, default=0.5,
+    parser.add_argument('--object_iou_thresh', type=float, default=0.5,
                         help='IoU threshold for the object bounding box match')
     parser.add_argument('--limit', type=int, default=None,
                         help='Max number of images to evaluate (default: all)')
@@ -332,7 +330,7 @@ def main():
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Testing on', device)
 
-    model, data_const = load_model(args.pretrained, args.proc_dir, device)
+    model, data_const = load_model(args.checkpoint_path, device)
 
     dataset = HicoDataset(data_const=data_const, subset=args.subset)
     global_ids = dataset.subset_ids
@@ -361,8 +359,8 @@ def main():
 
         gt_counts, tp, fp, fn = evaluate_image(
             model, test_data, image, device, num_classes,
-            human_iou_thres=args.human_iou_thres,
-            object_iou_thres=args.object_iou_thres,
+            human_iou_thresh=args.human_iou_thresh,
+            object_iou_thresh=args.object_iou_thresh,
         )
 
         gt_global += gt_counts
@@ -391,10 +389,10 @@ def main():
 
     mAP = ap_l[~np.isnan(ap_l)].mean()
     print()
-    print(f'mAP (Full Local Action): {mAP}')
+    print(f'mAP: {mAP}')
 
     print()
-    print('Full Action List:')
+    print('Full action list:')
     for idx, p in enumerate(precision_l):
         print(f'{idx + 1} Precision for {metadata.action_classes[idx]} is {p}')
 
