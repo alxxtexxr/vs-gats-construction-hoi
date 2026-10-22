@@ -1,8 +1,8 @@
 import os
 import random
 
-import utils.io as io
 from datasets.hico_constants import HicoConstants
+from utils import io
 
 
 def split(global_ids,val_frac):

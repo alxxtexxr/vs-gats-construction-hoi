@@ -1,26 +1,28 @@
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset
+import random
+import sys
 
 import h5py
 import numpy as np
-import utils.io as io 
-from datasets.hico_constants import HicoConstants
-from datasets import metadata
+import torch
+from torch.utils.data import Dataset
 
-import sys
-import random
+from datasets import metadata
+from datasets.hico_constants import HicoConstants
+from utils import io
+
 
 class HicoDataset(Dataset):
     '''
     Args:
         subset: ['train', 'val', 'train_val', 'test']
     '''
-    data_sample_count = 0   # record how many times to process data sampling 
+    data_sample_count = 0   # record how many times to process data sampling
 
-    def __init__(self, data_const=HicoConstants(), subset='train', data_aug=False, sampler=None, test=False):
-        super(HicoDataset, self).__init__()
-        
+    def __init__(self, data_const=None, subset='train', data_aug=False, sampler=None, test=False):
+        super().__init__()
+        if data_const is None:
+            data_const = HicoConstants()
+
         self.data_aug = data_aug
         self.data_const = data_const
         self.test = test
@@ -33,7 +35,7 @@ class HicoDataset(Dataset):
         global_ids = io.load_json_object(self.data_const.split_ids_json)
         bad_det_ids = io.load_json_object(self.data_const.bad_faster_rcnn_det_ids)
         # custom
-        bad_det_ids['no_human'] = ['WICO_train2024_00008801', 
+        bad_det_ids['no_human'] = ['WICO_train2024_00008801',
                                    'WICO_train2024_00008826',
                                    'WICO_train2024_00011228',
                                    'WICO_train2024_00016802',
@@ -90,8 +92,8 @@ class HicoDataset(Dataset):
         return word2vec
 
     def _get_interactive_label(self, edge_label):
-         
-        interactive_label = np.zeros(edge_label.shape[0])  
+
+        interactive_label = np.zeros(edge_label.shape[0])
         interactive_label = interactive_label[:, None]
         valid_idxs = list(set(np.where(edge_label==1)[0]))
         if len(valid_idxs) > 0:
@@ -108,24 +110,23 @@ class HicoDataset(Dataset):
         features = data['features']
         spatial_feat = data['spatial_feat']
         node_one_hot = data['node_one_hot']
-        node_one_hot_fasterrcnn = data['node_one_hot_fasterrcnn'] # CUSTOM
         word2vec = data['word2vec']
         word2vec_fasterrcnn = data['word2vec_fasterrcnn'] # CUSTOM
         keep_inds = list(set(np.where(node_labels == 1)[0]))
         original_inds = np.arange(node_num)
         remain_inds = np.delete(original_inds, keep_inds, axis=0)
         random_select_num = 0 if remain_inds.shape[0]==0 else random.choice(np.arange(remain_inds.shape[0]))  #int(remain_inds.shape[0]-1) if int(remain_inds.shape[0]-1)>0 else 0
-        random_select_inds = np.array(random.sample(remain_inds.tolist(), random_select_num), dtype=int) 
+        random_select_inds = np.array(random.sample(remain_inds.tolist(), random_select_num), dtype=int)
         choose_inds = sorted(np.hstack((keep_inds,random_select_inds)))
         # remove_inds = [x for x in original_inds if x not in choose_inds]
         if len(keep_inds)==0 or len(choose_inds)==1:
-            return data    
-        # re-construct the data 
+            return data
+        # re-construct the data
         try:
             spatial_feat_inds = []
             for i in choose_inds:
                 for j in choose_inds:
-                    if i == j: 
+                    if i == j:
                         continue
                     if j == 0:
                         ind = i * (node_num-1) + j
@@ -142,12 +143,11 @@ class HicoDataset(Dataset):
             data['roi_labels'] = np.array([roi_labels[int(i)] for i in choose_inds])  # !NOTE, it is important to transfer list to np.array
             data['roi_labels_fasterrcnn'] = np.array([roi_labels_fasterrcnn[int(i)] for i in choose_inds])  # !NOTE, it is important to transfer list to np.array # CUSTOM
             data['node_labels'] = node_labels[choose_inds, :]
-        except Exception as e:
-            import ipdb; ipdb.set_trace()
+        except (KeyError, IndexError, ValueError) as e:
             print(e)
         HicoDataset.data_sample_count+=1
         return data
-        
+
     @staticmethod
     def displaycount():
         print("total times to process data sampling:", HicoDataset.data_sample_count)
@@ -169,10 +169,10 @@ class HicoDataset(Dataset):
         global_id = self.subset_ids[idx]
 
         data = {}
-        
-        if global_id not in self.sub_app_data.keys():
+
+        if global_id not in self.sub_app_data:
             return None
-        
+
         single_app_data = self.sub_app_data[global_id]
         single_spatial_data = self.sub_spatial_data[global_id]
         data['img_name'] = global_id + '.jpg'
@@ -206,6 +206,9 @@ class HicoDataset(Dataset):
 
     # for inference
     def sample_date(self, global_id):
+        # CUSTOM: skip ids that are missing from the processed data (mirrors __getitem__)
+        if global_id not in self.sub_app_data:
+            return None
         data = {}
         # from pprint import pprint
         # pprint("self.sub_app_data =")
@@ -259,8 +262,8 @@ def collate_fn(batch):
     for data in batch:
         if data is None:
             continue
-        
-        if 'global_id' in data.keys():
+
+        if 'global_id' in data:
             batch_data['global_id'].append(data['global_id'])
             batch_data['det_boxes'].append(data['det_boxes'])
             batch_data['roi_scores'].append(data['roi_scores'])
@@ -281,7 +284,7 @@ def collate_fn(batch):
 
     # import ipdb; ipdb.set_trace()
     # batch_data['node_labels'] = torch.FloatTensor(np.concatenate(batch_data['node_labels'], axis=0))
-    
+
     # CUSTOM: If data is not exist, assign None values
     batch_data['edge_labels'] = torch.FloatTensor(np.concatenate(batch_data['edge_labels'], axis=0)) if len(batch_data['edge_labels']) else None
     batch_data['features'] = torch.FloatTensor(np.concatenate(batch_data['features'], axis=0)) if len(batch_data['features']) else None
