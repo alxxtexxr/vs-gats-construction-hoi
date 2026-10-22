@@ -433,7 +433,7 @@ assert len(obj_to_hoi) == len(hico_classes), "obj_to_hoi length must be equal to
 #     (0, 0), # 160 - human-material_used_unfinished_styrofoam_formwork_local_0 
 # ]
 
-# Used in vis_tool_custom.py and metadata.py
+# Used in vis_tool.py and metadata.py
 # obj_to_hoi = [hoi_classes[x[0] - 1: x[1]] for x in obj_hoi_index]
 # obj_to_hoi_fasterrcnn = [hoi_classes[x[0] - 1: x[1]] for x in obj_hoi_index_fasterrcnn] 
 

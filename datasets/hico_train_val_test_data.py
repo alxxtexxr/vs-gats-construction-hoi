@@ -192,7 +192,6 @@ def parse_data(data_const,args):
             # ipdb.set_trace()
             if args.vis_result:
                 image_gt = Image.open(os.path.join(data_const.clean_dir, 'images/train2015', img_name)).convert('RGB')
-                raw_action = np.zeros(117)
 
             if not len(data[i_img]['hoi']):
                 print(f"i_img = {i_img} is skipped")
@@ -228,8 +227,22 @@ def parse_data(data_const,args):
                     obj_index = get_node_index(classname, [o_x1, o_y1, o_x2, o_y2], det_class, det_boxes, node_num, labeled=args.labeled)
 
                     if args.vis_result:
-                        raw_action[action_id] = 1
-                        image_gt = vis_img(image_gt, [[h_x1, h_y1, h_x2, h_y2], [o_x1, o_y1, o_x2, o_y2]], [1, metadata.coco_classes.index(classname)], raw_action=action_id, data_gt=True)
+                        # One-edge score matrix for this annotated pair (human -> object);
+                        # the new vis_img reads per-edge action scores instead of a single id.
+                        gt_edge_scores = np.zeros((1, action_class_num))
+                        gt_edge_scores[0, action_id] = 1
+                        image_gt, _, _ = vis_img(
+                            image_gt,
+                            np.array([[h_x1, h_y1, h_x2, h_y2], [o_x1, o_y1, o_x2, o_y2]]),
+                            np.array([1, metadata.hico_classes.index(classname)]),
+                            np.ones(2, dtype=int),
+                            label_type='hico',
+                            raw_action=gt_edge_scores,
+                            score_thresh=0.5,
+                            filter_irrelevant_actions=False,
+                            filter_non_intersecting_det=False,
+                            filter_distant_det=False,
+                        )
 
                     if human_index != -1 and obj_index != -1:
                         edge_idx = labeled_edge_list[human_index-1] + (obj_index-human_index-1)
@@ -241,9 +254,15 @@ def parse_data(data_const,args):
             if args.vis_result:
                 # ipdb.set_trace()
                 image_res = Image.open(os.path.join(data_const.clean_dir, 'images/train2015', img_name)).convert('RGB')
-                result = vis_img(image_res, det_boxes, 
-                                 det_class_fasterrcnn, # det_class, 
-                                 det_scores, edge_labels, score_thresh=0.4)
+                result, _, _ = vis_img(
+                    image_res,
+                    det_boxes,
+                    det_class,             # HICO class labels
+                    det_class_fasterrcnn,  # Faster R-CNN class labels
+                    label_type='hico',
+                    raw_action=edge_labels,
+                    score_thresh=0.4,
+                )
                 plt.figure(figsize=(100,100))
                 plt.suptitle(img_name)
                 plt.subplot(1,2,1)

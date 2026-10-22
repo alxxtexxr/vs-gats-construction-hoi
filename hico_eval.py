@@ -27,7 +27,7 @@ from datasets.hico_dataset import HicoDataset, collate_fn
 from model.model import AGRNN
 from result.compute_map import compute_ap
 from utils.bbox_utils import compute_iou
-from utils.vis_tool_custom import vis_img, vis_img_v2
+from utils.vis_tool import vis_img
 
 
 def get_human_action_idxs(node_num, human_num):
@@ -286,7 +286,7 @@ def evaluate_image(model, data, image, device, num_classes,
     # Model predictions
     h_det_outputs, keep_idxs = run_inference(model, data, device)
 
-    _, _, det_h_bboxs_o_bboxs_action_class = vis_img_v2(
+    _, _, det_h_bboxs_o_bboxs_action_class = vis_img(
         img=image,
         bboxs=det_boxes,
         labels=roi_labels,
