@@ -37,7 +37,7 @@ bash datasets/hico_process.sh
 Start training by running:
 ```bash
 uv run hico_trainval.py \
-    --e_v='vs_gats_train' \
+    --e_v=<train_name> \
     --t_m='epoch' \
     --b_s=32 \
     --f_t='fc7' \
@@ -63,7 +63,7 @@ Model checkpoints are saved in the `checkpoints/` directory.
 Start evaluation by running:
 ```bash
 uv run hico_eval.py \
-    --checkpoint_path='checkpoints/hico/<train_name>/epoch_train/checkp
-oint_<epoch>_epoch.pth' \
+    --checkpoint_path=checkpoints/hico/<train_name>/epoch_train/checkp
+oint_<epoch>_epoch.pth \
     --subset='test'
 ```
