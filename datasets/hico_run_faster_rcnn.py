@@ -32,7 +32,7 @@ def get_device(device: str = "auto") -> str:
 if __name__ == "__main__":
 
     parse = argparse.ArgumentParser("Run Faster RCNN detection to generate instance detection data!!!")
-    parse.add_argument("--faster_rcnn_path", '--f_r_p', type=str, default=None, required=True,
+    parse.add_argument("--faster_rcnn_path", '--f_r_p', type=str, default='faster_rcnn.pth',
                         help="path to the Faster RCNN checkpoint")
     parse.add_argument('--device', '--d', type=str, default='auto',
                        choices=['auto', 'cuda', 'mps', 'cpu'],

@@ -4,3 +4,4 @@ processed
 __pycache__
 vcoco
 word2vec
+faster_rcnn.pth
