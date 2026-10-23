@@ -178,14 +178,19 @@ def compute_tp_fp_fn(pred_dets, gt_dets, num_classes, human_iou_thresh=0.5, obje
 
 def compute_pr(tp, fp, fn):
     """Compute precision and recall from scalar TP/FP/FN counts."""
-    try:
+    # Explicitly guard the denominator: numpy emits a RuntimeWarning (and returns
+    # nan) on a 0/0 division instead of raising ZeroDivisionError, so classes
+    # with no predictions/ground truth yield nan instead of noisy warnings.
+    # Keep the nan a numpy scalar: a plain Python float nan breaks compute_ap's
+    # scalar indexing (`precision[recall >= t]`).
+    if tp + fp > 0:
         precision = tp / (tp + fp)
-    except ZeroDivisionError:
-        precision = np.nan
-    try:
+    else:
+        precision = np.float64(np.nan)
+    if tp + fn > 0:
         recall = tp / (tp + fn)
-    except ZeroDivisionError:
-        recall = np.nan
+    else:
+        recall = np.float64(np.nan)
     return precision, recall
 
 
@@ -327,8 +332,8 @@ def main():
                         help='Max number of images to evaluate (default: all)')
     args = parser.parse_args()
 
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    print('Testing on', device)
+    device = torch.device('cuda' if torch.cuda.is_available() and args.gpu else 'cpu')
+    print('Evaluating on {}...'.format(device))
 
     model, data_const = load_model(args.checkpoint_path, device)
 
@@ -369,10 +374,12 @@ def main():
         fn_l_global += fn
 
     print()
-    print(f'Per-class results (subset: {args.subset}):')
-    print(f'{"Class":<40s} {"GT":>6s} {"TP":>6s} {"FP":>6s} {"FN":>6s}')
+    print(f'Per-class results:')
+    print("-"*64)
+    print(f'{"Class":<36s} {"GT":>6s} {"TP":>6s} {"FP":>6s} {"FN":>6s}')
+    print("-"*64)
     for i in range(num_classes):
-        print(f'{metadata.action_classes[i]:<40s} '
+        print(f'{metadata.action_classes[i]:<36s} '
               f'{gt_global[i]:>6d} {tp_l_global[i]:>6d} '
               f'{fp_l_global[i]:>6d} {fn_l_global[i]:>6d}')
 
@@ -388,13 +395,17 @@ def main():
     ap_l = np.array(ap_l)
 
     mAP = ap_l[~np.isnan(ap_l)].mean()
-    print()
-    print(f'mAP: {mAP}')
 
     print()
-    print('Full action list:')
+    print('Per-class precisions:')
+    print("-"*64)
+    print(f'{"Class":<45s} {"Precision":>18s}')
+    print("-"*64)
     for idx, p in enumerate(precision_l):
-        print(f'{idx + 1} Precision for {metadata.action_classes[idx]} is {p}')
+        print(f'{metadata.action_classes[idx]:<45s} {p:>18g}')
+    
+    print()
+    print(f'mAP: {mAP}')
 
 
 if __name__ == '__main__':

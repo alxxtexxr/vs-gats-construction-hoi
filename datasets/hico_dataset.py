@@ -150,7 +150,7 @@ class HicoDataset(Dataset):
 
     @staticmethod
     def displaycount():
-        print("total times to process data sampling:", HicoDataset.data_sample_count)
+        print("Total times to process data sampling:", HicoDataset.data_sample_count)
 
     # def get_verb_one_hot(self,hoi_ids):
     #     num_cand = len(hoi_ids)

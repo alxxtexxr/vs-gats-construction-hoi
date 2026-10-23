@@ -17,18 +17,6 @@ from utils import io
 
 # from utils.vis_tool import vis_img
 
-def get_device(device: str = "auto") -> str:
-    if device != "auto":
-        return device
-    if torch.cuda.is_available():
-        return "cuda"
-    # NOTE: MPS is deliberately NOT part of the auto fallback. On Apple Silicon,
-    # torchvision's ResNet-FPN detection models hit very slow Metal kernel paths
-    # (measured ~12x slower than the same CPU), and long command buffers trip the
-    # macOS GPU watchdog (kIOGPUCommandBufferCallbackErrorImpactingInteractivity).
-    # Use --device=mps explicitly if you want to try it anyway.
-    return "cpu"
-
 if __name__ == "__main__":
 
     parse = argparse.ArgumentParser("Run Faster RCNN detection to generate instance detection data!!!")
@@ -50,8 +38,11 @@ if __name__ == "__main__":
 
     args = parse.parse_args()
     
+    # determine device
+    device = torch.device('cuda' if torch.cuda.is_available() and args.gpu else 'cpu')
+    print('Running on {}...'.format(device))
+    
     # set up model
-    device = get_device(args.device)
     checkpoint = torch.load(args.faster_rcnn_path, map_location=device)
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn(coco_model=False, rpn_post_nms_top_n_test=200, \
                                                                  box_batch_size_per_image=128, box_score_thresh=0.1, box_nms_thresh=0.3,
@@ -60,14 +51,10 @@ if __name__ == "__main__":
     model.to(device)
     if args.half and device in ('mps', 'cuda'):
         model = model.half()
-        print('Using FP16 (half precision) inference.')
+        print('Using FP16 (half precision) inference')
     model.eval()
 
     print('Beginning...')
-    print(f'Device: {device}{" (auto)" if args.device == "auto" else ""}')
-    print('Batch size:', args.batch_size)
-    print('Number of workers:', args.num_workers)
-    print('FP16:', args.half)
     data_const = HicoConstants()
     anno_list = io.load_json_object(data_const.anno_list_json)
     save_dir = data_const.faster_rcnn_boxes

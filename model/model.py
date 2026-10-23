@@ -109,12 +109,10 @@ class AGRNN(nn.Module):
 
     def _build_graph(self, node_num, roi_label, node_space, diff_edge):
 
-        graph = dgl.DGLGraph()
-        graph.add_nodes(node_num)
-
         edge_list, h_node_list, obj_node_list, h_h_e_list, o_o_e_list, h_o_e_list, readout_edge_list, readout_h_h_e_list, readout_h_o_e_list = self._collect_edge(node_num, roi_label, node_space, diff_edge)
         src, dst = tuple(zip(*edge_list))
-        graph.add_edges(src, dst)   # make the graph bi-directional
+        # DGL 2.x: construct homogeneous graphs with dgl.graph() (dgl.DGLGraph() is deprecated)
+        graph = dgl.graph((src, dst), num_nodes=int(node_num))
 
         return graph, h_node_list, obj_node_list, h_h_e_list, o_o_e_list, h_o_e_list, readout_edge_list, readout_h_h_e_list, readout_h_o_e_list
 
@@ -273,9 +271,7 @@ if __name__ == "__main__":
         for dst in range(node_num):
             edge_list.append((src,dst))
     src, dst = tuple(zip(*edge_list))
-    g = dgl.DGLGraph()
-    g.add_nodes(node_num)
-    g.add_edges(src, dst)
+    g = dgl.graph((src, dst), num_nodes=node_num)
     import ipdb; ipdb.set_trace()
     e_data = torch.eye(9)
     n_data = torch.arange(9)

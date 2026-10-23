@@ -38,12 +38,12 @@ def run_model(args, data_const):
     # print(train_dataset[0])
     val_dataset = HicoDataset(data_const=data_const, subset='val', data_aug=False, sampler=args.sampler)
     dataset = {'train': train_dataset, 'val': val_dataset}
-    print('set up dataset variable successfully')
+    print('Set up dataset variable successfully')
     # use default DataLoader() to load the data. 
     train_dataloader = DataLoader(dataset=dataset['train'], batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     val_dataloader = DataLoader(dataset=dataset['val'], batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     dataloader = {'train': train_dataloader, 'val': val_dataloader}
-    print('set up dataloader successfully')
+    print('Set up dataloader successfully')
 
     # print()
     # print("torch.cuda.is_available():", torch.cuda.is_available())
@@ -51,7 +51,7 @@ def run_model(args, data_const):
     # print()
 
     device = torch.device('cuda' if torch.cuda.is_available() and args.gpu else 'cpu')
-    print('training on {}...'.format(device))
+    print('Training on {}...'.format(device))
 
     # ================================
     # INIT. MODEL
@@ -112,7 +112,7 @@ def run_model(args, data_const):
         else:
             model_config = model.CONFIG3.save_config()
             io.dump_json_object(model_config, os.path.join(args.save_dir, args.exp_ver, 'l3_config.json'))
-    print('save key configurations successfully...')
+    print('Save key configurations successfully...')
 
     if args.train_model == 'epoch':
         epoch_train(model, dataloader, dataset, criterion, optimizer, scheduler, device, data_const)
@@ -120,7 +120,7 @@ def run_model(args, data_const):
         iteration_train(model, dataloader, dataset, criterion, optimizer, scheduler, device, data_const)
 
 def epoch_train(model, dataloader, dataset, criterion, optimizer, scheduler, device, data_const):
-    print('epoch training...')
+    print('Epoch training...')
     
     # set visualization and create folder to save checkpoints
     writer = SummaryWriter(log_dir=args.log_dir + '/' + args.exp_ver + '/' + 'epoch_train')
