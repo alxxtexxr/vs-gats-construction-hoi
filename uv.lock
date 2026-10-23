@@ -1426,7 +1426,7 @@ wheels = [
 ]
 
 [[package]]
-name = "vs-gats-structural-hhi-hoi"
+name = "vs-gats-construction-hoi"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
