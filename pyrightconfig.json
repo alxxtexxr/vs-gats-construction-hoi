@@ -1,10 +1,6 @@
 {
   "venvPath": ".",
   "venv": ".venv",
-  "extraPaths": [".venv/lib/python3.12/site-packages"],
-  "include": ["datasets", "utils", "model"],
-  "typeCheckingMode": "off",
-  "diagnosticSeverityOverrides": {
-    "reportMissingImports": "none"
-  }
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic"
 }
